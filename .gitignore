@@ -1,0 +1,48 @@
+# Dependencies
+/node_modules/
+
+# Generated build and release artifacts
+/build/
+/dist/
+
+# Native build artifacts
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.d
+compile_commands.json
+
+# Test and coverage output
+/coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# Logs and process state
+*.log
+*.pid
+*.pid.lock
+npm-debug.log*
+
+# Editor and IDE state
+/.idea/
+/.vscode/
+/.venv-shexli/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Local environment and temporary files
+.env
+.env.*
+!.env.example
+*.tmp
+*.temp
+*.bak

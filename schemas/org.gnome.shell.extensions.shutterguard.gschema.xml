@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.shutterguard" path="/org/gnome/shell/extensions/shutterguard/">
+    <key name="active" type="b"><default>false</default><summary>Whether ShutterGuard is active</summary></key>
+    <key name="frequency" type="i"><range min="10" max="300"/><default>60</default><summary>Keepalive interval in seconds</summary></key>
+    <key name="camera-model" type="s"><default>''</default><summary>Selected camera model</summary></key>
+    <key name="camera-port" type="s"><default>''</default><summary>Selected camera USB port</summary></key>
+  </schema>
+</schemalist>

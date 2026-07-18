@@ -1,0 +1,56 @@
+.shutterguard-header {
+  spacing: 12px;
+  padding: 4px 2px;
+}
+
+.shutterguard-header-icon {
+  icon-size: 32px;
+}
+
+.shutterguard-title {
+  font-weight: 700;
+}
+
+.shutterguard-status,
+.shutterguard-value-label {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.9em;
+}
+
+.shutterguard-frequency-box {
+  min-width: 280px;
+  spacing: 8px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.shutterguard-control-label {
+  font-weight: 600;
+}
+
+.shutterguard-active {
+  color: #57e389;
+}
+
+.shutterguard-warning {
+  color: #f8e45c;
+}
+
+.shutterguard-helper-warning {
+  spacing: 10px;
+  padding: 6px 2px;
+}
+
+.shutterguard-warning-icon {
+  icon-size: 24px;
+  color: #f8e45c;
+}
+
+.shutterguard-warning-title {
+  font-weight: 700;
+}
+
+.shutterguard-warning-detail {
+  opacity: 0.7;
+  font-size: 0.88em;
+}

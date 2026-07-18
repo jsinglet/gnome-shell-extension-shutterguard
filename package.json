@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "devDependencies": {
+    "@girs/gjs": "latest",
+    "@girs/gnome-shell": "latest",
+    "typescript": "latest"
+  }
+}

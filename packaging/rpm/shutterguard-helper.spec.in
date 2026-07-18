@@ -1,0 +1,49 @@
+Name:           shutterguard-helper
+Version:        @VERSION@
+Release:        3%{?dist}
+Summary:        Canon EOS Live View keepalive helper for ShutterGuard
+
+License:        MIT
+Source0:        %{name}-%{version}.tar.gz
+URL:            https://github.com/jsinglet/gnome-shell-extension-shutterguard
+
+BuildRequires:  gcc
+BuildRequires:  pkgconfig
+BuildRequires:  pkgconfig(libgphoto2)
+Requires:       libgphoto2
+
+%description
+ShutterGuard Helper is the native camera-control component used by the
+ShutterGuard GNOME Shell extension. It maintains a persistent libgphoto2 PTP
+session with a selected Canon EOS camera, keeps Live View active, detects lost
+sessions, and reconnects automatically.
+
+The helper does not capture, process, or transmit video. It preserves Canon's
+physical TFT/HDMI display path while USB carries control and keepalive traffic,
+without changing video resolution, frame rate, compression, or zoom. Install
+the matching ShutterGuard GNOME extension separately.
+
+%prep
+%autosetup
+
+%build
+%{__cc} %{build_cflags} $(pkg-config --cflags libgphoto2) \
+    backend/shutterguard-helper.c -o shutterguard-helper \
+    $(pkg-config --libs libgphoto2)
+
+%install
+install -Dpm0755 shutterguard-helper \
+    %{buildroot}%{_libexecdir}/shutterguard/shutterguard-helper
+mkdir -p %{buildroot}%{_bindir}
+ln -s ../libexec/shutterguard/shutterguard-helper \
+    %{buildroot}%{_bindir}/shutterguard-helper
+
+%files
+%license LICENSE
+%{_libexecdir}/shutterguard/shutterguard-helper
+%{_bindir}/shutterguard-helper
+
+%changelog
+* Sat Jul 18 2026 John L. Singleton <john@singletonmail.com> - @VERSION@-1
+- Package the native libgphoto2 keepalive helper independently from the GNOME
+  Shell extension.

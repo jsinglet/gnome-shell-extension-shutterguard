@@ -1,0 +1,9 @@
+{
+  "uuid": "shutterguard@singletonmail.com",
+  "name": "ShutterGuard",
+  "description": "Keeps Canon EOS Live View active over USB. Requires the separate shutterguard-helper RPM. Supported targets: Fedora 43/44 and EPEL-enabled RHEL 9/10-compatible systems on x86_64 or aarch64. Install it before enabling ShutterGuard: sudo dnf install dnf-plugins-core && sudo dnf copr enable johnlsingleton/shutterguard && sudo dnf install shutterguard-helper",
+  "version-name": "0.4.8",
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "settings-schema": "org.gnome.shell.extensions.shutterguard",
+  "url" : "https://github.com/jsinglet/gnome-shell-extension-shutterguard"
+}
