@@ -42,6 +42,9 @@ function loadDevelopmentHelperPath(
     marker.load_contents_async(cancellable, (file, result) => {
         try {
             const [, contents] = file!.load_contents_finish(result);
+            if (cancellable.is_cancelled()) { 
+                return;
+            }
             const path = new TextDecoder().decode(contents).trim();
             callback(GLib.file_test(path, GLib.FileTest.IS_EXECUTABLE) ? path : null);
         } catch {
@@ -539,20 +542,27 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
             process.communicate_utf8_async(null, this._cancellable, (_source, result) => {
                 try {
                     const [ok, , stderr] = process.communicate_utf8_finish(result);
-                    if (this._cancellable.is_cancelled()) return;
+                    if (this._cancellable.is_cancelled()){
+                         return;
+                    }
                     if (!ok) throw new Error(stderr || 'release request failed');
                     this._blockerDetail.text = `${processName} was asked to close · retrying`;
                     this._releaseBlockerItem.visible = false;
                     this._setStatus('Camera released · retrying', 'warning');
                     this._scheduleRestart();
                 } catch (e) {
-                    if (this._cancellable.is_cancelled()) return;
+                    if (this._cancellable.is_cancelled()){
+                        return
+                    };
                     this._blockerDetail.text = `Could not close ${processName}; run: kill ${pid}`;
                     this._releaseBlockerItem.sensitive = true;
                     this._log(`blocker release failed: ${e}`);
                 }
             });
         } catch (e) {
+            if (this._cancellable.is_cancelled()) { 
+                return;
+            }
             this._blockerDetail.text = `Could not close ${processName}; run: kill ${pid}`;
             this._releaseBlockerItem.sensitive = true;
             this._log(`could not start blocker release: ${e}`);
@@ -579,11 +589,17 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
             process.communicate_utf8_async(null, this._cancellable, (_source, result) => {
                 try {
                     const [ok, stdout, stderr] = process.communicate_utf8_finish(result);
+                    if (this._cancellable.is_cancelled()) { 
+                       return;
+                    }
                     if (generation !== this._scanGeneration) return;
                     this._scanProcess = null;
                     if (!ok) throw new Error(stderr || 'camera scan failed');
                     this._showCameras(parseCameraList(stdout || ''));
                 } catch (e) {
+                    if (this._cancellable.is_cancelled()) { 
+                        return;
+                    }                    
                     if (generation !== this._scanGeneration) return;
                     this._scanProcess = null;
                     this._log(`camera scan failed: ${e}`);
@@ -591,6 +607,9 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
                 }
             });
         } catch (e) {
+            if (this._cancellable.is_cancelled()) { 
+                return;
+            }
             this._scanProcess = null;
             this._log(`could not start camera scan: ${e}`);
             this._showCameras([], 'Camera scan unavailable');
@@ -658,9 +677,18 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
                 Gio.MountUnmountFlags.NONE, null, this._cancellable, (_source, result) => {
                     try {
                         mount.unmount_with_operation_finish(result);
+                        if (this._cancellable.is_cancelled()) { 
+                           return;
+                        }
                         this._log(`released automatic camera mount ${uri}`);
                     } catch (e) {
+                        if (this._cancellable.is_cancelled()) { 
+                           return;
+                        }
                         this._log(`could not release camera mount ${uri}: ${e}`);
+                    }
+                    if (this._cancellable.is_cancelled()) { 
+                       return;
                     }
                     if (--pending === 0) {
                         this._starting = false;
@@ -692,8 +720,10 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
             const stream = new Gio.DataInputStream({base_stream: this._process.get_stdout_pipe()!});
             const readLine = () => stream.read_line_async(GLib.PRIORITY_DEFAULT, this._cancellable, (_source, result) => {
                 try {
-                    const [line] = stream.read_line_finish_utf8(result);
-                    if (this._cancellable.is_cancelled()) return;
+                    const [line] = stream.read_line_finish_utf8(result);                    
+                    if (this._cancellable.is_cancelled()) { 
+                        return;
+                    }
                     if (line !== null) {
                         this._log(`helper: ${line}`);
                         if (line.includes('event=device-blocked'))
@@ -707,18 +737,39 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
                             this._setStatus('Camera unavailable · retrying', 'warning');
                         readLine();
                     }
-                } catch (e) { this._log(`log stream ended: ${e}`); }
+                } catch (e) { 
+                
+                    if (this._cancellable.is_cancelled()) { 
+                       return;
+                    }
+                    
+                    this._log(`log stream ended: ${e}`); 
+                
+                }
             });
             readLine();
             const process = this._process;
             process.wait_check_async(this._cancellable, (_source, result) => {
-                try { process.wait_check_finish(result); this._log('helper exited normally'); }
-                catch (e) { this._log(`helper exited with error: ${e}`); }
+                try { 
+                    process.wait_check_finish(result); 
+                    if (this._cancellable.is_cancelled()) { 
+                       return;
+                    }
+                    this._log('helper exited normally'); 
+                }
+                catch (e) { 
+                    if (this._cancellable.is_cancelled()) { 
+                       return;
+                    }
+                    this._log(`helper exited with error: ${e}`); 
+                }
                 if (this._process === process) {
                     this._process = null;
                     const restartPending = this._restartPending;
-                    this._restartPending = false;
-                    if (this._cancellable.is_cancelled()) return;
+                    this._restartPending = false;             
+                    if (this._cancellable.is_cancelled()) { 
+                        return;
+                    }
                     if (this._settings.get_boolean('active')) {
                         if (restartPending) {
                             this._setStatus('Restarting camera protection…', 'warning');
@@ -736,6 +787,9 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
                 }
             });
         } catch (e) {
+            if (this._cancellable.is_cancelled()) { 
+                return;
+            }
             this._process = null;
             this._setStatus('Unable to start camera service', 'warning');
             this._log(`could not start helper: ${e}`);
