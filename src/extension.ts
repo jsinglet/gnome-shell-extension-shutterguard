@@ -34,17 +34,20 @@ function resolveInstalledHelperPath(): HelperResolution {
 
 function loadDevelopmentHelperPath(
     extensionPath: string,
+    cancellable: Gio.Cancellable,
     callback: (path: string | null) => void,
 ): void {
     const marker = Gio.File.new_for_path(
         GLib.build_filenamev([extensionPath, '.dev-helper-path']));
-    marker.load_contents_async(null, (file, result) => {
+    marker.load_contents_async(cancellable, (file, result) => {
         try {
             const [, contents] = file!.load_contents_finish(result);
             const path = new TextDecoder().decode(contents).trim();
             callback(GLib.file_test(path, GLib.FileTest.IS_EXECUTABLE) ? path : null);
         } catch {
-            // A missing marker is the normal production configuration.
+            if(cancellable.is_cancelled()){
+                return;
+            }
             callback(null);
         }
     });
@@ -91,13 +94,14 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
     declare private _retrySource: number;
     declare private _mountDelaySource: number;
     declare private _scanGeneration: number;
-    declare private _destroyed: boolean;
+    declare private _cancellable: Gio.Cancellable;
 
     override _init(...args: unknown[]): void {
         const [settings, extensionPath, openPreferences] = args as [
             Gio.Settings, string, () => void,
         ];
         super._init(0.0, 'ShutterGuard', false);
+        this._cancellable = new Gio.Cancellable();
         this._settings = settings;
         this._extensionPath = extensionPath;
         this._openPreferences = openPreferences;
@@ -111,7 +115,6 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
         this._retrySource = 0;
         this._mountDelaySource = 0;
         this._scanGeneration = 0;
-        this._destroyed = false;
         this._blockerPid = 0;
         this._blockerProcess = '';
         const helper = resolveInstalledHelperPath();
@@ -340,8 +343,8 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
     }
 
     private _loadDevelopmentHelper(): void {
-        loadDevelopmentHelperPath(this._extensionPath, path => {
-            if (this._destroyed || !path) return;
+        loadDevelopmentHelperPath(this._extensionPath, this._cancellable, path => {
+            if (this._cancellable.is_cancelled() || !path) return;
             const changed = path !== this._helperPathValue || !this._developmentMode;
             this._helperPathValue = path;
             this._developmentMode = true;
@@ -533,16 +536,17 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
                 '--release-blocker', pid.toString(),
                 '--camera-port', port,
             ], Gio.SubprocessFlags.STDERR_PIPE);
-            process.communicate_utf8_async(null, null, (_source, result) => {
+            process.communicate_utf8_async(null, this._cancellable, (_source, result) => {
                 try {
                     const [ok, , stderr] = process.communicate_utf8_finish(result);
-                    if (this._destroyed) return;
+                    if (this._cancellable.is_cancelled()) return;
                     if (!ok) throw new Error(stderr || 'release request failed');
                     this._blockerDetail.text = `${processName} was asked to close · retrying`;
                     this._releaseBlockerItem.visible = false;
                     this._setStatus('Camera released · retrying', 'warning');
                     this._scheduleRestart();
                 } catch (e) {
+                    if (this._cancellable.is_cancelled()) return;
                     this._blockerDetail.text = `Could not close ${processName}; run: kill ${pid}`;
                     this._releaseBlockerItem.sensitive = true;
                     this._log(`blocker release failed: ${e}`);
@@ -572,7 +576,7 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
                 [this._helperPathValue, '--list-cameras'],
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
             const process = this._scanProcess;
-            process.communicate_utf8_async(null, null, (_source, result) => {
+            process.communicate_utf8_async(null, this._cancellable, (_source, result) => {
                 try {
                     const [ok, stdout, stderr] = process.communicate_utf8_finish(result);
                     if (generation !== this._scanGeneration) return;
@@ -651,7 +655,7 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
         for (const mount of mounts) {
             const uri = mount.get_root().get_uri();
             mount.unmount_with_operation(
-                Gio.MountUnmountFlags.NONE, null, null, (_source, result) => {
+                Gio.MountUnmountFlags.NONE, null, this._cancellable, (_source, result) => {
                     try {
                         mount.unmount_with_operation_finish(result);
                         this._log(`released automatic camera mount ${uri}`);
@@ -686,10 +690,10 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
             });
             this._process = launcher.spawnv(args);
             const stream = new Gio.DataInputStream({base_stream: this._process.get_stdout_pipe()!});
-            const readLine = () => stream.read_line_async(GLib.PRIORITY_DEFAULT, null, (_source, result) => {
+            const readLine = () => stream.read_line_async(GLib.PRIORITY_DEFAULT, this._cancellable, (_source, result) => {
                 try {
                     const [line] = stream.read_line_finish_utf8(result);
-                    if (this._destroyed) return;
+                    if (this._cancellable.is_cancelled()) return;
                     if (line !== null) {
                         this._log(`helper: ${line}`);
                         if (line.includes('event=device-blocked'))
@@ -707,14 +711,14 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
             });
             readLine();
             const process = this._process;
-            process.wait_check_async(null, (_source, result) => {
+            process.wait_check_async(this._cancellable, (_source, result) => {
                 try { process.wait_check_finish(result); this._log('helper exited normally'); }
                 catch (e) { this._log(`helper exited with error: ${e}`); }
                 if (this._process === process) {
                     this._process = null;
                     const restartPending = this._restartPending;
                     this._restartPending = false;
-                    if (this._destroyed) return;
+                    if (this._cancellable.is_cancelled()) return;
                     if (this._settings.get_boolean('active')) {
                         if (restartPending) {
                             this._setStatus('Restarting camera protection…', 'warning');
@@ -749,7 +753,7 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
     }
 
     private _restartHelperAfterExit(): void {
-        if (!this._settings.get_boolean('active') || this._destroyed) return;
+        if (!this._settings.get_boolean('active') || this._cancellable.is_cancelled()) return;
         if (!this._process) {
             this._start();
             return;
@@ -772,7 +776,7 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
     }
 
     override destroy(): void {
-        this._destroyed = true;
+        this._cancellable.cancel();
         this._scanGeneration++;
         this._scanProcess?.force_exit();
         this._scanProcess = null;
