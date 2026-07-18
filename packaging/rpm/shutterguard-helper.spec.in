@@ -1,6 +1,6 @@
 Name:           shutterguard-helper
 Version:        @VERSION@
-Release:        3%{?dist}
+Release:        1%{?dist}
 Summary:        Canon EOS Live View keepalive helper for ShutterGuard
 
 License:        MIT
