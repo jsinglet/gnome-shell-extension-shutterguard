@@ -1,12 +1,14 @@
 {
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "format:generated": "eslint --fix \"build/compiled/*.js\" && prettier --write \"build/compiled/*.js\"",
+    "build": "tsc -p tsconfig.json && eslint --fix \"build/compiled/*.js\""
   },
   "devDependencies": {
     "@girs/gjs": "latest",
     "@girs/gnome-shell": "latest",
-    "prettier": "^3.9.5",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.7.0",
     "typescript": "latest"
   }
 }
