@@ -78,22 +78,13 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
     declare private _blockerTitle: St.Label;
     declare private _blockerDetail: St.Label;
     declare private _releaseBlockerItem: PopupMenu.PopupImageMenuItem;
-    declare private _releaseBlockerSignalId: number;
     declare private _blockerPid: number;
     declare private _blockerProcess: string;
     declare private _cameraMenu: PopupMenu.PopupSubMenuMenuItem;
     declare private _refreshItem: PopupMenu.PopupImageMenuItem;
-    declare private _refreshSignalId: number;
     declare private _preferencesItem: PopupMenu.PopupImageMenuItem;
-    declare private _preferencesSignalId: number;
     declare private _frequencyLabel: St.Label;
     declare private _slider: Slider;
-    declare private _sliderSignalId: number;
-    declare private _activeSignalId: number;
-    declare private _settingsFrequencySignalId: number;
-    declare private _settingsActiveSignalId: number;
-    declare private _settingsCameraSignalId: number;
-    declare private _menuSignalId: number;
     declare private _syncingFrequency: boolean;
     declare private _frequencyCommitSource: number;
     declare private _restartSource: number;
@@ -201,22 +192,33 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
         this._releaseBlockerItem = new PopupMenu.PopupImageMenuItem(
             'Release camera and retry', 'media-eject-symbolic');
         this._releaseBlockerItem.visible = false;
-        this._releaseBlockerSignalId = this._releaseBlockerItem.connect(
-            'activate', () => this._requestBlockerRelease());
+
+        
+        this._releaseBlockerItem.connectObject(
+            'activate', () => this._requestBlockerRelease(),
+            this
+        );
+
         menu.addMenuItem(this._releaseBlockerItem);
 
         this._activeItem = new PopupMenu.PopupSwitchMenuItem(
             'Protect Live View', settings.get_boolean('active'));
-        this._activeSignalId = this._activeItem.connect('toggled', (_item, state) => {
-            // Re-resolve here as well as on menu open so an RPM installed after
-            // Shell startup is usable without reloading the whole session.
-            if (state && !this._refreshHelperResolution()) {
-                this._activeItem.setToggleState(false);
-                this._showHelperMissing();
-                return;
-            }
-            settings.set_boolean('active', state);
-        });
+        
+        
+        this._activeItem.connectObject('toggled',
+            (_item: PopupMenu.PopupSwitchMenuItem, state: boolean) => {
+                // Re-resolve here as well as on menu open so an RPM installed after
+                // Shell startup is usable without reloading the whole session.
+                if (state && !this._refreshHelperResolution()) {
+                    this._activeItem.setToggleState(false);
+                    this._showHelperMissing();
+                    return;
+                }
+                settings.set_boolean('active', state);
+            },
+            this
+        );
+        
         menu.addMenuItem(this._activeItem);
 
         this._cameraMenu = new PopupMenu.PopupSubMenuMenuItem('Scanning for cameras…', true);
@@ -250,26 +252,45 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
         menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this._refreshItem = new PopupMenu.PopupImageMenuItem('Scan for cameras', 'view-refresh-symbolic');
         this._refreshItem.sensitive = this._helperPathValue !== null;
-        this._refreshSignalId = this._refreshItem.connect(
-            'activate', () => this._refreshCameras());
+        
+        this._refreshItem.connectObject(
+            'activate', 
+            () => this._refreshCameras(),
+            this
+        );
+        
         menu.addMenuItem(this._refreshItem);
         this._preferencesItem = new PopupMenu.PopupImageMenuItem(
             'ShutterGuard Settings', 'emblem-system-symbolic');
-        this._preferencesSignalId = this._preferencesItem.connect(
-            'activate', () => this._openPreferences());
+        
+        this._preferencesItem.connectObject(
+            'activate',
+            () => this._openPreferences(),
+            this
+        );
+            
         menu.addMenuItem(this._preferencesItem);
 
-        this._sliderSignalId = this._slider.connect(
-            'notify::value', () => this._onSliderChanged());
-        this._settingsFrequencySignalId = settings.connect(
-            'changed::frequency', () => this._syncFrequency());
-        this._settingsActiveSignalId = settings.connect(
-            'changed::active', () => this._syncActive());
-        this._settingsCameraSignalId = settings.connect(
-            'changed::camera-port', () => this._syncCameraSelection());
-        this._menuSignalId = menu.connect('open-state-changed', (_menu, isOpen) => {
-            if (isOpen && this._refreshHelperResolution()) this._refreshCameras();
-        });
+        this._slider.connectObject(
+            'notify::value',
+            () => this._onSliderChanged(),
+            this
+        );
+        
+        settings.connectObject(
+            'changed::frequency', () => this._syncFrequency(),
+            'changed::active', () => this._syncActive(),
+            'changed::camera-port', () => this._syncCameraSelection(),
+            this
+        );
+        
+        menu.connectObject(
+            'open-state-changed',
+            (_menu : PopupMenu.PopupMenu, isOpen : boolean) => {
+                if (isOpen && this._refreshHelperResolution()) this._refreshCameras();
+            },   
+            this
+        );
 
         this._cameraMenu.sensitive = this._helperPathValue !== null;
         this._syncFrequency();
@@ -595,13 +616,16 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
             const item = new PopupMenu.PopupMenuItem(`${camera.model}  (${camera.port})`);
             item.setOrnament(camera.port === selected.port
                 ? PopupMenu.Ornament.CHECK : PopupMenu.Ornament.NONE);
-            item.connect('activate', () => {
-                this._settings.set_string('camera-model', camera.model);
-                this._settings.set_string('camera-port', camera.port);
-                this._cameraMenu.label.text = camera.model;
-                this._log(`selected camera model=\"${camera.model}\" port=${camera.port}`);
-                this._showCameras(cameras);
-            });
+            item.connectObject(
+                'activate', () => {
+                    this._settings.set_string('camera-model', camera.model);
+                    this._settings.set_string('camera-port', camera.port);
+                    this._cameraMenu.label.text = camera.model;
+                    this._log(`selected camera model=\"${camera.model}\" port=${camera.port}`);
+                    this._showCameras(cameras);
+                    }, 
+                this
+            );
             this._cameraMenu.menu.addMenuItem(item);
         }
         this._log(`camera scan complete; count=${cameras.length} selected=\"${selected.model}\"`);
@@ -764,16 +788,15 @@ class ShutterGuardIndicatorBase extends PanelMenu.Button {
         this._restartSource = 0;
         this._retrySource = 0;
         this._mountDelaySource = 0;
-        this._releaseBlockerItem.disconnect(this._releaseBlockerSignalId);
-        this._activeItem.disconnect(this._activeSignalId);
-        this._refreshItem.disconnect(this._refreshSignalId);
-        this._preferencesItem.disconnect(this._preferencesSignalId);
-        this._slider.disconnect(this._sliderSignalId);
-        this._settings.disconnect(this._settingsFrequencySignalId);
-        this._settings.disconnect(this._settingsActiveSignalId);
-        this._settings.disconnect(this._settingsCameraSignalId);
-        (this.menu as PopupMenu.PopupMenu).disconnect(this._menuSignalId);
         this._stop();
+        /** cleanup */
+        this._releaseBlockerItem.disconnectObject(this);
+        this._activeItem.disconnectObject(this);
+        this._refreshItem.disconnectObject(this);
+        this._preferencesItem.disconnectObject(this);
+        this._slider.disconnectObject(this);
+        this._settings.disconnectObject(this);
+        this.menu?.disconnectObject(this);
         super.destroy();
     }
 }

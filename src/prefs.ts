@@ -111,16 +111,18 @@ export default class ShutterGuardPreferences extends ExtensionPreferences {
             css_classes: ['flat'],
         });
         this._scanButton.sensitive = helper.path !== null;
-        this._scanButton.connect('clicked', () => this._refreshCameras(settings));
+        this._scanButton.connectObject('clicked', () => this._refreshCameras(settings), window);
         this._cameraRow.add_suffix(this._scanButton);
-        this._cameraRow.connect('notify::selected', () => {
+        this._cameraRow.connectObject('notify::selected', () => {
             if (this._updatingCamera || !this._cameraRow) return;
             const camera = this._cameras[this._cameraRow.selected];
             if (!camera) return;
             settings.set_string('camera-model', camera.model);
             settings.set_string('camera-port', camera.port);
             this._cameraRow.subtitle = camera.port;
-        });
+            }, 
+            window
+        );
         cameraGroup.add(this._cameraRow);
         page.add(cameraGroup);
 
@@ -140,16 +142,20 @@ export default class ShutterGuardPreferences extends ExtensionPreferences {
             }),
             numeric: true,
         });
-        frequency.connect('notify::value', () => {
+        frequency.connectObject('notify::value', () => {
             const value = Math.round(frequency.value);
-            if (settings.get_int('frequency') !== value)
-                settings.set_int('frequency', value);
-        });
-        settings.connect('changed::frequency', () => {
+                if (settings.get_int('frequency') !== value)
+                    settings.set_int('frequency', value);
+            },
+            window
+        );
+        settings.connectObject('changed::frequency', () => {
             const value = settings.get_int('frequency');
-            if (Math.round(frequency.value) !== value)
-                frequency.value = value;
-        });
+                if (Math.round(frequency.value) !== value)
+                    frequency.value = value;
+            },
+            window
+        );
         timing.add(frequency);
         page.add(timing);
 
@@ -162,11 +168,21 @@ export default class ShutterGuardPreferences extends ExtensionPreferences {
         page.add(about);
 
         window.add(page);
-        window.connect('close-request', () => {
-            this._scanProcess?.force_exit();
-            this._scanProcess = null;
-            return false;
-        });
+        window.connectObject('close-request', () => {
+
+                settings.disconnectObject(window);
+
+                this._scanProcess?.force_exit();
+                this._scanProcess = null;
+                this._cameras = [];
+                this._cameraRow = null;
+                this._scanButton = null;
+                this._updatingCamera = false;
+                this._helperPathValue = null;
+                return false;
+            }, 
+            window
+        );
         if (this._helperPathValue)
             this._refreshCameras(settings);
         else {
